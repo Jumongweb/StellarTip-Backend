@@ -8,7 +8,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { TipsService } from './tips.service';
+import { TipsService, TipFilterOptions } from './tips.service';
 import { CreateTipDto } from './dto/create-tip.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TipCreationThrottle } from '../config/throttle.config';
@@ -37,8 +37,26 @@ export class TipsController {
     @Request() req,
     @Query('page') page = 1,
     @Query('limit') limit = 20,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('asset') asset?: string,
+    @Query('minAmount') minAmount?: number,
+    @Query('maxAmount') maxAmount?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
   ) {
-    return this.tipsService.getTipsByCreator(req.user.id, +page, +limit);
+    const filterOptions: TipFilterOptions = {
+      page: +page,
+      limit: +limit,
+      startDate,
+      endDate,
+      asset,
+      minAmount: minAmount ? +minAmount : undefined,
+      maxAmount: maxAmount ? +maxAmount : undefined,
+      sortBy,
+      sortOrder,
+    };
+    return this.tipsService.getTipsByCreator(req.user.id, filterOptions);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -47,8 +65,26 @@ export class TipsController {
     @Request() req,
     @Query('page') page = 1,
     @Query('limit') limit = 20,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('asset') asset?: string,
+    @Query('minAmount') minAmount?: number,
+    @Query('maxAmount') maxAmount?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
   ) {
-    return this.tipsService.getTipsBySupporter(req.user.id, +page, +limit);
+    const filterOptions: TipFilterOptions = {
+      page: +page,
+      limit: +limit,
+      startDate,
+      endDate,
+      asset,
+      minAmount: minAmount ? +minAmount : undefined,
+      maxAmount: maxAmount ? +maxAmount : undefined,
+      sortBy,
+      sortOrder,
+    };
+    return this.tipsService.getTipsBySupporter(req.user.id, filterOptions);
   }
 
   @Get('wallet/:walletAddress')
@@ -56,8 +92,26 @@ export class TipsController {
     @Param('walletAddress') walletAddress: string,
     @Query('page') page = 1,
     @Query('limit') limit = 20,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('asset') asset?: string,
+    @Query('minAmount') minAmount?: number,
+    @Query('maxAmount') maxAmount?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
   ) {
-    return this.tipsService.getTipsByWallet(walletAddress, +page, +limit);
+    const filterOptions: TipFilterOptions = {
+      page: +page,
+      limit: +limit,
+      startDate,
+      endDate,
+      asset,
+      minAmount: minAmount ? +minAmount : undefined,
+      maxAmount: maxAmount ? +maxAmount : undefined,
+      sortBy,
+      sortOrder,
+    };
+    return this.tipsService.getTipsByWallet(walletAddress, filterOptions);
   }
 
   @UseGuards(JwtAuthGuard)
