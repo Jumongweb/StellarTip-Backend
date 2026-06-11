@@ -4,7 +4,7 @@ import * as request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 
-describe('AppController (e2e)', () => {
+describe('Notifications (e2e)', () => {
   let app: INestApplication<App>;
   let hasDb = false;
 
@@ -25,11 +25,22 @@ describe('AppController (e2e)', () => {
     if (app) await app.close();
   });
 
-  it('/ (GET)', async () => {
+  it('GET /notifications requires auth', async () => {
+    if (!hasDb) return;
+    await request(app.getHttpServer()).get('/notifications').expect(401);
+  });
+
+  it('GET /notifications/unread-count requires auth', async () => {
     if (!hasDb) return;
     await request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('StellarTip API — Decentralized micro-tipping on Stellar');
+      .get('/notifications/unread-count')
+      .expect(401);
+  });
+
+  it('PATCH /notifications/:id/read requires auth', async () => {
+    if (!hasDb) return;
+    await request(app.getHttpServer())
+      .patch('/notifications/fake-id/read')
+      .expect(401);
   });
 });

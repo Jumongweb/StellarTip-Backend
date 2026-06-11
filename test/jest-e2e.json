@@ -5,5 +5,12 @@
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(uuid|@nestjs)/)"
+  ],
+  "moduleNameMapper": {
+    "^@auth/(.*)$": "<rootDir>/../src/auth/$1",
+    "^@auth$": "<rootDir>/../src/auth"
   }
 }
