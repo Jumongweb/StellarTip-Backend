@@ -15,6 +15,7 @@ import { ProfilesModule } from './profiles/profiles.module';
 import { StellarModule } from './stellar/stellar.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthModule } from './health/health.module';
+import { SharedModule } from './shared/shared.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { HealthModule } from './health/health.module';
     StellarModule,
     NotificationsModule,
     HealthModule,
+    SharedModule,
   ],
   controllers: [AppController],
   providers: [
