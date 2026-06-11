@@ -1,17 +1,34 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
+import * as compression from 'compression';
+import { StructuredLogger } from './shared/logging/logging.config';
 
 async function bootstrap(): Promise<void> {
-  const logger = new Logger('Bootstrap');
+  const appLogger = new StructuredLogger();
+
   try {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule, {
+      logger: appLogger,
+    });
 
-    // Enable CORS
-    app.enableCors();
+    // Security headers
+    app.use(helmet());
 
-    // Global validation pipes with detailed options
+    // Response compression
+    app.use(compression());
+
+    // CORS
+    app.enableCors({
+      origin: process.env.CORS_ORIGIN || '*',
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      credentials: true,
+    });
+
+    // Global validation pipes
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -23,17 +40,72 @@ async function bootstrap(): Promise<void> {
       }),
     );
 
+    // Swagger / OpenAPI documentation
+    const config = new DocumentBuilder()
+      .setTitle('StellarTip API')
+      .setDescription(
+        'Decentralized micro-tipping platform on the Stellar blockchain. ' +
+          'Tip creators with XLM or USDC — no intermediaries, just Stellar.',
+      )
+      .setVersion('0.1.0')
+      .addBearerAuth()
+      .addTag('auth', 'Authentication endpoints')
+      .addTag('profiles', 'Creator profile management')
+      .addTag('tips', 'Tip transactions and history')
+      .addTag('stellar', 'Stellar blockchain interaction')
+      .addTag('notifications', 'In-app notifications')
+      .addTag('health', 'Health check and monitoring')
+      .addServer('http://localhost:3000', 'Local development')
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+    });
+
     const port = process.env.PORT || 3000;
     await app.listen(port);
+
+    // Graceful shutdown
+    function shutdown(signal: string): void {
+      appLogger.log(
+        `Received ${signal}, shutting down gracefully...`,
+        'Bootstrap',
+      );
+      app
+        .close()
+        .then(() => {
+          appLogger.log('HTTP server closed', 'Bootstrap');
+          process.exit(0);
+        })
+        .catch(() => process.exit(1));
+    }
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
 
     // Check and log database connection status
     const dataSource = app.get(DataSource);
     if (dataSource.isInitialized) {
-      logger.log('📦 Database connection established');
+      appLogger.log('📦 Database connection established', 'Database');
     }
-    logger.log(`⚡ Application is running on: http://localhost:${port}`);
+    appLogger.log(
+      `⚡ Application running on http://localhost:${port}`,
+      'Bootstrap',
+    );
+    appLogger.log(
+      `📘 API Docs available at http://localhost:${port}/api/docs`,
+      'Bootstrap',
+    );
   } catch (error) {
-    logger.error('Error starting application:', error);
+    const msg = error instanceof Error ? error.message : String(error);
+    appLogger.error(
+      'Failed to start application: ' + msg,
+      error instanceof Error ? error.stack : undefined,
+      'Fatal',
+    );
     process.exit(1);
   }
 }
