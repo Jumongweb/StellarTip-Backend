@@ -308,4 +308,204 @@ export class ProfilesService {
       .take(20)
       .getMany();
   }
+
+  async getAnalytics(
+    userId: string,
+    period: string = '30d',
+    asset?: string,
+  ): Promise<{
+    summary: {
+      totalTipsReceived: number;
+      totalAmountReceived: number;
+      averageTipAmount: number;
+      largestTipAmount: number;
+    };
+    byAsset: Array<{
+      asset: string;
+      totalAmount: number;
+      tipCount: number;
+    }>;
+    timeSeries: Array<{
+      date: string;
+      count: number;
+      totalAmount: number;
+      asset: string;
+    }>;
+    topSupporters: Array<{
+      walletAddress: string;
+      totalAmount: number;
+      tipCount: number;
+      lastTipAt: Date | null;
+    }>;
+    period: string;
+    generatedAt: string;
+  }> {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'walletAddress'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Calculate date range based on period
+    let startDate: Date | undefined;
+    if (period !== 'all') {
+      const days = parseInt(period.replace('d', ''), 10);
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+    }
+
+    // Summary: total tips, total amount, average, largest
+    // TypeORM getRawOne/getRawMany return any from query builder
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const summaryResult = await this.tipsRepository
+      .createQueryBuilder('tip')
+      .select('COUNT(tip.id)', 'totalTips')
+      .addSelect('COALESCE(SUM(tip.amount), 0)', 'totalAmount')
+      .addSelect('COALESCE(AVG(tip.amount), 0)', 'averageAmount')
+      .addSelect('COALESCE(MAX(tip.amount), 0)', 'largestAmount')
+      .where('tip.receiverWallet = :wallet', {
+        wallet: user.walletAddress,
+      })
+      .andWhere('tip.status = :status', { status: TipStatus.COMPLETED })
+      .andWhere(
+        startDate ? 'tip.createdAt >= :startDate' : '1=1',
+        startDate ? { startDate } : {},
+      )
+      .andWhere(
+        asset ? 'tip.asset = :asset' : '1=1',
+        asset ? { asset: asset.toUpperCase() } : {},
+      )
+      .getRawOne();
+
+    // By asset breakdown
+
+    const byAssetResult = await this.tipsRepository
+      .createQueryBuilder('tip')
+      .select('tip.asset', 'asset')
+      .addSelect('COALESCE(SUM(tip.amount), 0)', 'totalAmount')
+      .addSelect('COUNT(tip.id)', 'tipCount')
+      .where('tip.receiverWallet = :wallet', {
+        wallet: user.walletAddress,
+      })
+      .andWhere('tip.status = :status', { status: TipStatus.COMPLETED })
+      .andWhere(
+        startDate ? 'tip.createdAt >= :startDate' : '1=1',
+        startDate ? { startDate } : {},
+      )
+      .groupBy('tip.asset')
+      .getRawMany();
+
+    // Time series: daily breakdown for the period
+
+    const timeSeriesResult = await this.tipsRepository
+      .createQueryBuilder('tip')
+      .select("DATE_TRUNC('day', tip.createdAt)", 'date')
+      .addSelect('COUNT(tip.id)', 'count')
+      .addSelect('COALESCE(SUM(tip.amount), 0)', 'totalAmount')
+      .addSelect('tip.asset', 'asset')
+      .where('tip.receiverWallet = :wallet', {
+        wallet: user.walletAddress,
+      })
+      .andWhere('tip.status = :status', { status: TipStatus.COMPLETED })
+      .andWhere(
+        startDate ? 'tip.createdAt >= :startDate' : '1=1',
+        startDate ? { startDate } : {},
+      )
+      .andWhere(
+        asset ? 'tip.asset = :asset' : '1=1',
+        asset ? { asset: asset.toUpperCase() } : {},
+      )
+      .groupBy("DATE_TRUNC('day', tip.createdAt)")
+      .addGroupBy('tip.asset')
+      .orderBy("DATE_TRUNC('day', tip.createdAt)", 'ASC')
+      .getRawMany();
+
+    // Top 5 supporters
+
+    const topSupportersResult = await this.tipsRepository
+      .createQueryBuilder('tip')
+      .select('tip.senderWallet', 'walletAddress')
+      .addSelect('COALESCE(SUM(tip.amount), 0)', 'totalAmount')
+      .addSelect('COUNT(tip.id)', 'tipCount')
+      .addSelect('MAX(tip.createdAt)', 'lastTipAt')
+      .where('tip.receiverWallet = :wallet', {
+        wallet: user.walletAddress,
+      })
+      .andWhere('tip.status = :status', { status: TipStatus.COMPLETED })
+      .andWhere('tip.senderWallet IS NOT NULL')
+      .andWhere("tip.senderWallet != ''")
+      .andWhere(
+        startDate ? 'tip.createdAt >= :startDate' : '1=1',
+        startDate ? { startDate } : {},
+      )
+      .andWhere(
+        asset ? 'tip.asset = :asset' : '1=1',
+        asset ? { asset: asset.toUpperCase() } : {},
+      )
+      .groupBy('tip.senderWallet')
+      .orderBy('SUM(tip.amount)', 'DESC')
+      .limit(5)
+      .getRawMany();
+
+    // Safely extract raw query results with type assertions
+    // TypeORM getRawOne/getRawMany return any; values need explicit string conversion
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-base-to-string */
+    const summary = summaryResult || {};
+    const byAsset: Array<{
+      asset: string;
+      totalAmount: number;
+      tipCount: number;
+    }> = (byAssetResult || []).map((row: Record<string, unknown>) => ({
+      asset: String(row.asset || 'XLM'),
+      totalAmount: parseFloat(String(row.totalAmount || '0')),
+      tipCount: parseInt(String(row.tipCount || '0'), 10),
+    }));
+
+    const timeSeries: Array<{
+      date: string;
+      count: number;
+      totalAmount: number;
+      asset: string;
+    }> = (timeSeriesResult || []).map((row: Record<string, unknown>) => ({
+      date: String(row.date || ''),
+      count: parseInt(String(row.count || '0'), 10),
+      totalAmount: parseFloat(String(row.totalAmount || '0')),
+      asset: String(row.asset || 'XLM'),
+    }));
+
+    const topSupporters: Array<{
+      walletAddress: string;
+      totalAmount: number;
+      tipCount: number;
+      lastTipAt: Date | null;
+    }> = (topSupportersResult || []).map((row: Record<string, unknown>) => ({
+      walletAddress: String(row.walletAddress || ''),
+      totalAmount: parseFloat(String(row.totalAmount || '0')),
+      tipCount: parseInt(String(row.tipCount || '0'), 10),
+      lastTipAt: row.lastTipAt ? new Date(String(row.lastTipAt)) : null,
+    }));
+
+    const totalTips = parseInt(String(summary.totalTips || '0'), 10);
+    const totalAmount = parseFloat(String(summary.totalAmount || '0'));
+    const averageAmount = parseFloat(String(summary.averageAmount || '0'));
+    const largestAmount = parseFloat(String(summary.largestAmount || '0'));
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-base-to-string */
+
+    return {
+      summary: {
+        totalTipsReceived: totalTips,
+        totalAmountReceived: totalAmount,
+        averageTipAmount: Math.round(averageAmount * 10000000) / 10000000,
+        largestTipAmount: largestAmount,
+      },
+      byAsset,
+      timeSeries,
+      topSupporters,
+      period,
+      generatedAt: new Date().toISOString(),
+    };
+  }
 }
