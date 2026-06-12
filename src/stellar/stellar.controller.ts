@@ -8,7 +8,7 @@ import {
   Post,
   Body,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { StellarService } from './stellar.service';
 
 @ApiTags('stellar')
@@ -18,6 +18,7 @@ export class StellarController {
 
   constructor(private readonly stellarService: StellarService) {}
 
+  @ApiOperation({ summary: 'Get XLM and token balances for a wallet' })
   @Get('balance')
   async getBalance(
     @Query('walletAddress') walletAddress: string,
@@ -31,6 +32,7 @@ export class StellarController {
     return this.stellarService.getAccountBalance(walletAddress);
   }
 
+  @ApiOperation({ summary: 'Get Stellar account details' })
   @Get('account')
   async getAccount(@Query('walletAddress') walletAddress: string): Promise<{
     address: string;
@@ -48,6 +50,7 @@ export class StellarController {
     return this.stellarService.getAccountInfo(walletAddress);
   }
 
+  @ApiOperation({ summary: 'Verify a Stellar payment transaction' })
   @Post('verify-payment')
   async verifyPayment(
     @Body('transactionHash') transactionHash: string,
