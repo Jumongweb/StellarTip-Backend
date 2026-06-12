@@ -28,7 +28,7 @@ jest.mock('@stellar/stellar-sdk', () => {
 describe('StellarService', () => {
   let service: StellarService;
 
-  const createMockAccount = () => ({
+  const createMockAccount = (): Record<string, unknown> => ({
     balances: [
       {
         asset_type: 'native',
@@ -46,7 +46,7 @@ describe('StellarService', () => {
     subentry_count: 2,
   });
 
-  const createMockTx = () => ({
+  const createMockTx = (): Record<string, unknown> => ({
     source_account: 'GSOURCE...',
     operations: [
       {
