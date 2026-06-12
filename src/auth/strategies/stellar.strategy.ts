@@ -4,9 +4,12 @@ import { Strategy } from 'passport-custom';
 import { Keypair } from '@stellar/stellar-sdk';
 import { AuthService } from '@auth/auth.service';
 import { User } from '../../entities/user.entity';
+import { StructuredLogger } from '../../shared/logging/logging.config';
 
 @Injectable()
 export class StellarStrategy extends PassportStrategy(Strategy, 'stellar') {
+  private readonly logger = new StructuredLogger();
+
   constructor(private authService: AuthService) {
     super();
   }
@@ -54,8 +57,13 @@ export class StellarStrategy extends PassportStrategy(Strategy, 'stellar') {
       return Promise.resolve(
         keypair.verify(Buffer.from(message), Buffer.from(signature, 'base64')),
       );
-    } catch (error) {
-      console.error('Error verifying Stellar signature:', error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        'Error verifying Stellar signature: ' + message,
+        undefined,
+        'StellarStrategy',
+      );
       return Promise.resolve(false);
     }
   }
