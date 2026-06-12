@@ -30,6 +30,7 @@ import { User } from '../entities/user.entity';
 export class ProfilesController {
   constructor(private readonly profilesService: ProfilesService) {}
 
+  @ApiOperation({ summary: 'Get tipping info for a creator profile' })
   @Get(':username/tipping-info')
   async getTippingInfo(
     @Param('username') username: string,
@@ -37,11 +38,13 @@ export class ProfilesController {
     return this.profilesService.getTippingInfo(username);
   }
 
+  @ApiOperation({ summary: 'Get public profile by username' })
   @Get(':username')
   async getProfile(@Param('username') username: string): Promise<User | null> {
     return this.profilesService.getProfile(username);
   }
 
+  @ApiOperation({ summary: 'Search profiles by query' })
   @Get()
   async searchProfiles(@Query('q') query: string): Promise<User[]> {
     if (!query) {
@@ -63,6 +66,8 @@ export class ProfilesController {
     return this.profilesService.getAnalytics(req.user!.id, period, asset);
   }
 
+  @ApiOperation({ summary: 'Update authenticated user profile' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Put('me')
   async updateProfile(
@@ -72,6 +77,8 @@ export class ProfilesController {
     return this.profilesService.updateProfile(req.user!.id, updateDto);
   }
 
+  @ApiOperation({ summary: 'Update social links on profile' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Patch('me/social-links')
   async updateSocialLinks(
@@ -81,6 +88,8 @@ export class ProfilesController {
     return this.profilesService.updateSocialLinks(req.user!.id, socialLinksDto);
   }
 
+  @ApiOperation({ summary: 'Upload profile avatar image' })
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Post('me/avatar')
   @UseInterceptors(FileInterceptor('avatar'))
