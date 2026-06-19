@@ -213,6 +213,7 @@ export class TipsService {
 
     const tip = new Tip();
     tip.creator = creator;
+    tip.creatorId = creator.id;
     tip.supporterId = supporterId || null;
     tip.senderWallet = senderWallet || '';
     tip.receiverWallet = receiverWallet;
@@ -221,7 +222,7 @@ export class TipsService {
     tip.assetIssuer =
       tipAsset === TipAsset.USDC ? assetIssuer || this.usdcIssuer : null;
     tip.message = message || '';
-    tip.transactionHash = transactionHash || '';
+    tip.transactionHash = transactionHash || null;
     tip.status = transactionHash ? TipStatus.COMPLETED : TipStatus.PENDING;
 
     return this.tipsRepository.save(tip);

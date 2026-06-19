@@ -14,6 +14,13 @@ export enum TipStatus {
   FAILED = 'failed',
 }
 
+export enum TipWithdrawalStatus {
+  NONE = 'none',
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
 export enum TipAsset {
   XLM = 'XLM',
   USDC = 'USDC',
@@ -61,7 +68,7 @@ export class Tip {
   message: string;
 
   @Column({ unique: true, nullable: true })
-  transactionHash: string;
+  transactionHash: string | null;
 
   @Column({
     type: 'enum',
@@ -69,6 +76,21 @@ export class Tip {
     default: TipStatus.PENDING,
   })
   status: TipStatus;
+
+  @Column({
+    name: 'withdrawal_status',
+    type: 'enum',
+    enum: TipWithdrawalStatus,
+    default: TipWithdrawalStatus.NONE,
+  })
+  withdrawalStatus: TipWithdrawalStatus;
+
+  @Column({
+    name: 'withdrawal_transaction_hash',
+    unique: true,
+    nullable: true,
+  })
+  withdrawalTransactionHash: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -3,7 +3,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { TipsService } from './tips.service';
-import { Tip, TipStatus, TipAsset } from '../entities/tip.entity';
+import {
+  Tip,
+  TipStatus,
+  TipAsset,
+  TipWithdrawalStatus,
+} from '../entities/tip.entity';
 import { User } from '../entities/user.entity';
 
 describe('TipsService', () => {
@@ -25,6 +30,8 @@ describe('TipsService', () => {
     message: 'Great work!',
     transactionHash: null,
     status: TipStatus.PENDING,
+    withdrawalStatus: TipWithdrawalStatus.NONE,
+    withdrawalTransactionHash: null,
     createdAt: new Date(),
   };
 

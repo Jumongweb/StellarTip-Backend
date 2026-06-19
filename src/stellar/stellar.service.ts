@@ -1,14 +1,44 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Horizon } from '@stellar/stellar-sdk';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { createHmac, timingSafeEqual } from 'crypto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { TipsService } from '../tips/tips.service';
+import {
+  Tip,
+  TipAsset,
+  TipWithdrawalStatus,
+} from '../entities/tip.entity';
+import {
+  REGISTER_EVENT,
+  StellarContractEventPayload,
+  TIP_EVENT,
+  WITHDRAWAL_EVENT,
+  normalizeContractEventTopic,
+} from './contract/events';
 
 @Injectable()
 export class StellarService implements OnModuleInit {
   private readonly logger = new Logger(StellarService.name);
+  private static readonly MAX_EVENT_AGE_MS = 5 * 60 * 1000;
   private server: Horizon.Server;
   private network: string;
 
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private configService: ConfigService,
+    @InjectRepository(Tip)
+    private readonly tipsRepository: Repository<Tip>,
+    private readonly tipsService: TipsService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   onModuleInit(): void {
     const serverUrl =
@@ -136,6 +166,214 @@ export class StellarService implements OnModuleInit {
         subentryCount: 0,
         network: this.network,
       };
+    }
+  }
+
+  async handleContractWebhook(
+    payload: StellarContractEventPayload,
+    rawBody: Buffer | undefined,
+    signature: string | undefined,
+  ): Promise<{ accepted: true; duplicate: boolean }> {
+    this.assertWebhookSignature(rawBody, signature);
+    this.assertEventIsFresh(payload);
+
+    if (await this.isDuplicateTransaction(payload.transactionHash)) {
+      return { accepted: true, duplicate: true };
+    }
+
+    const topic = normalizeContractEventTopic(payload.topic);
+
+    switch (topic) {
+      case TIP_EVENT:
+        await this.persistTipEvent(payload);
+        break;
+      case WITHDRAWAL_EVENT:
+        await this.persistWithdrawalEvent(payload);
+        break;
+      case REGISTER_EVENT:
+        this.logger.log(
+          `Received register event for transaction ${payload.transactionHash}`,
+        );
+        break;
+      default:
+        throw new BadRequestException('Unsupported contract event topic');
+    }
+
+    return { accepted: true, duplicate: false };
+  }
+
+  private assertWebhookSignature(
+    rawBody: Buffer | undefined,
+    signature: string | undefined,
+  ): void {
+    const secret = this.configService.get<string>('STELLAR_WEBHOOK_SECRET');
+
+    if (!secret) {
+      throw new UnauthorizedException('Webhook secret is not configured');
+    }
+
+    if (!rawBody || rawBody.length === 0 || !signature) {
+      throw new UnauthorizedException('Invalid webhook signature');
+    }
+
+    const expectedSignature = createHmac('sha256', secret)
+      .update(rawBody)
+      .digest('hex');
+
+    const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+    const actualBuffer = Buffer.from(signature, 'utf8');
+
+    if (
+      expectedBuffer.length !== actualBuffer.length ||
+      !timingSafeEqual(expectedBuffer, actualBuffer)
+    ) {
+      throw new UnauthorizedException('Invalid webhook signature');
+    }
+  }
+
+  private assertEventIsFresh(payload: StellarContractEventPayload): void {
+    const eventTimestamp = new Date(payload.timestamp);
+
+    if (Number.isNaN(eventTimestamp.getTime())) {
+      throw new BadRequestException('Invalid event timestamp');
+    }
+
+    const ageMs = Math.abs(Date.now() - eventTimestamp.getTime());
+    if (ageMs > StellarService.MAX_EVENT_AGE_MS) {
+      throw new UnauthorizedException('Webhook event is outside replay window');
+    }
+  }
+
+  private async isDuplicateTransaction(transactionHash: string): Promise<boolean> {
+    if (!transactionHash) {
+      throw new BadRequestException('transactionHash is required');
+    }
+
+    const existingTip = await this.tipsRepository.findOne({
+      where: [
+        { transactionHash },
+        { withdrawalTransactionHash: transactionHash },
+      ],
+    });
+
+    return Boolean(existingTip);
+  }
+
+  private async persistTipEvent(
+    payload: StellarContractEventPayload,
+  ): Promise<void> {
+    const data = payload.data || {};
+    const receiverWallet = this.readString(data.receiverWallet);
+    const senderWallet = this.readString(data.senderWallet);
+    const asset = this.normalizeAsset(data.asset);
+    const amount = this.readAmount(data.amount);
+    const message = this.readOptionalString(data.message);
+    const assetIssuer = this.readOptionalString(data.assetIssuer);
+
+    const tip = await this.tipsService.createTip({
+      receiverWallet,
+      senderWallet,
+      amount,
+      message: message || undefined,
+      asset,
+      assetIssuer: assetIssuer || undefined,
+      transactionHash: payload.transactionHash,
+    });
+
+    await this.notificationsService.notifyTipReceived(
+      tip.creatorId,
+      tip.senderWallet,
+      tip.amount,
+      tip.asset,
+    );
+  }
+
+  private async persistWithdrawalEvent(
+    payload: StellarContractEventPayload,
+  ): Promise<void> {
+    const data = payload.data || {};
+    const linkedTipId = this.readOptionalString(data.tipId);
+    const linkedTipTransactionHash = this.readOptionalString(
+      data.tipTransactionHash,
+    );
+
+    if (!linkedTipId && !linkedTipTransactionHash) {
+      this.logger.warn(
+        `Withdrawal event ${payload.transactionHash} has no linked tip reference`,
+      );
+      return;
+    }
+
+    const tip = await this.tipsRepository.findOne({
+      where: linkedTipId
+        ? { id: linkedTipId }
+        : { transactionHash: linkedTipTransactionHash! },
+    });
+
+    if (!tip) {
+      this.logger.warn(
+        `No tip found for withdrawal event ${payload.transactionHash}`,
+      );
+      return;
+    }
+
+    tip.withdrawalStatus = this.normalizeWithdrawalStatus(data.status);
+    tip.withdrawalTransactionHash = payload.transactionHash;
+    await this.tipsRepository.save(tip);
+  }
+
+  private readString(value: unknown): string {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      throw new BadRequestException('Webhook payload is missing required fields');
+    }
+
+    return value.trim();
+  }
+
+  private readOptionalString(value: unknown): string | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private readAmount(value: unknown): number {
+    const amount =
+      typeof value === 'number' ? value : Number(this.readString(value));
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Webhook payload has an invalid amount');
+    }
+
+    return amount;
+  }
+
+  private normalizeAsset(value: unknown): TipAsset {
+    const rawAsset =
+      this.readOptionalString(value)?.toUpperCase() || TipAsset.XLM;
+
+    if (rawAsset === TipAsset.XLM || rawAsset === TipAsset.USDC) {
+      return rawAsset;
+    }
+
+    throw new BadRequestException('Unsupported webhook asset');
+  }
+
+  private normalizeWithdrawalStatus(value: unknown): TipWithdrawalStatus {
+    const status = this.readOptionalString(value)?.toLowerCase();
+
+    switch (status) {
+      case TipWithdrawalStatus.PENDING:
+        return TipWithdrawalStatus.PENDING;
+      case TipWithdrawalStatus.FAILED:
+        return TipWithdrawalStatus.FAILED;
+      case TipWithdrawalStatus.COMPLETED:
+      case null:
+        return TipWithdrawalStatus.COMPLETED;
+      default:
+        throw new BadRequestException('Unsupported withdrawal status');
     }
   }
 }
