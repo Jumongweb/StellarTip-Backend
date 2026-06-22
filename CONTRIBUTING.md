@@ -86,29 +86,16 @@ src/
 
 ## Dependency Management
 
-We use [Dependabot](https://docs.github.com/en/code-security/dependabot) to keep npm and GitHub Actions dependencies up to date automatically.
+Dependabot is currently **disabled** for this repository. The `.github/dependabot.yml` configuration and the auto-merge workflow have been removed, so automated PRs for npm and GitHub Actions updates are no longer generated.
 
-### Schedule
+To update dependencies manually:
 
-Dependabot opens PRs every **Monday at 09:00 UTC**. Related packages are batched into groups so you won't see a flood of individual PRs:
+- **Local audit**: run `npm outdated` and `npm audit` to see what's behind.
+- **Update**: use `npm update <pkg>` for in-range bumps, or `npm install <pkg>@latest` for the latest.
+- **Verify**: run `npm run lint`, `npx tsc --noEmit`, and `npm test` before committing.
+- **Commit message**: use the `deps:` prefix (e.g. `deps: bump @nestjs/common from 11.0.1 to 11.1.0`) for consistency with prior history.
 
-| Group | Packages |
-|---|---|
-| `nestjs-ecosystem` | `@nestjs/*`, `nest-*` |
-| `stellar` | `@stellar/*`, `stellar-*` |
-| `dev-tools` | ESLint, Prettier, TypeScript, Jest, Husky, lint-staged, `@types/*`, ts-\* |
-
-A maximum of **10 open Dependabot PRs** are allowed at any time.
-
-### Review requirements
-
-| Semver bump | Action required |
-|---|---|
-| **patch** | Auto-merged by CI after all checks pass — no review needed |
-| **minor** | Requires one team member review; check the changelog summary comment left by the bot |
-| **major** | Requires two team member reviews; assess breaking changes and update code accordingly before merging |
-
-All Dependabot PRs use the `deps` conventional-commit prefix (e.g. `deps: bump @nestjs/common from 11.0.1 to 11.1.0`).
+If you want to re-enable Dependabot in the future, add a new `.github/dependabot.yml` config and recreate the `.github/workflows/dependabot-auto-merge.yml` workflow from git history.
 
 ## License
 
