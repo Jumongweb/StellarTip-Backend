@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { StellarService } from './stellar.service';
 import { ConfigService } from '@nestjs/config';
 import { Tip } from '../entities/tip.entity';
+import { User } from '../entities/user.entity';
 import { TipsService } from '../tips/tips.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -102,6 +103,12 @@ describe('StellarService', () => {
           useValue: {
             findOne: jest.fn(),
             save: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: {
+            findOne: jest.fn(),
           },
         },
         {
