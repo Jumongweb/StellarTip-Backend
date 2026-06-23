@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { createHmac } from 'crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -22,10 +21,7 @@ import {
   NotificationType,
 } from '../src/entities/notification.entity';
 import { NotificationsService } from '../src/notifications/notifications.service';
-import {
-  TIP_EVENT,
-  WITHDRAWAL_EVENT,
-} from '../src/stellar/contract/events';
+import { TIP_EVENT, WITHDRAWAL_EVENT } from '../src/stellar/contract/events';
 
 describe('Stellar contract webhook (e2e)', () => {
   let app: INestApplication<App>;

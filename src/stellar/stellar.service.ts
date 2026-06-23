@@ -12,11 +12,7 @@ import { Repository } from 'typeorm';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TipsService } from '../tips/tips.service';
-import {
-  Tip,
-  TipAsset,
-  TipWithdrawalStatus,
-} from '../entities/tip.entity';
+import { Tip, TipAsset, TipWithdrawalStatus } from '../entities/tip.entity';
 import {
   REGISTER_EVENT,
   StellarContractEventPayload,
@@ -26,8 +22,10 @@ import {
 } from './contract/events';
 
 // Type definitions for contract client
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-redundant-type-constituents */
-type ContractClient = any;
+type ContractClient = Record<
+  string,
+  (...args: Array<Record<string, unknown>>) => Promise<unknown>
+>;
 
 export interface ContractTipVerificationResult {
   exists: boolean;
@@ -36,7 +34,6 @@ export interface ContractTipVerificationResult {
   amount: number;
   timestamp: string | null;
 }
-/* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-redundant-type-constituents */
 
 @Injectable()
 export class StellarService implements OnModuleInit {
@@ -86,8 +83,20 @@ export class StellarService implements OnModuleInit {
     }
 
     if (!this.contractClient) {
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
-      this.contractClient = await (Contract as any).Client.from({
+      this.contractClient = await (
+        Contract as unknown as {
+          Client: {
+            from: (config: {
+              contractId: string;
+              rpcUrl: string;
+              networkPassphrase: string;
+              allowHttp: boolean;
+              server: rpc.Server;
+              publicKey: undefined;
+            }) => Promise<ContractClient>;
+          };
+        }
+      ).Client.from({
         contractId: this.contractId,
         rpcUrl: this.sorobanRpcUrl,
         networkPassphrase: this.networkPassphrase,
@@ -95,7 +104,6 @@ export class StellarService implements OnModuleInit {
         server: this.sorobanServer,
         publicKey: undefined,
       });
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
     }
 
     return this.contractClient;
@@ -196,19 +204,13 @@ export class StellarService implements OnModuleInit {
   ): Promise<ContractTipVerificationResult> {
     try {
       const client = await this.getContractClient();
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
-      const contractAny = client as unknown as Record<
-        string,
-        (...args: Array<Record<string, unknown>>) => Promise<unknown>
-      >;
 
       const [balanceResponse, tipCountResponse, tipResponse] =
         await Promise.all([
-          contractAny.get_balance({ creatorAddress }),
-          contractAny.get_tip_count({ creatorAddress }),
-          contractAny.get_tip({ creatorAddress, tipIndex }),
+          client.get_balance({ creatorAddress }),
+          client.get_tip_count({ creatorAddress }),
+          client.get_tip({ creatorAddress, tipIndex }),
         ]);
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 
       const balance = this.toFiniteNumber(this.extractResult(balanceResponse));
       const tipCount = this.toFiniteNumber(
@@ -263,15 +265,29 @@ export class StellarService implements OnModuleInit {
       }
 
       // Access SDK response fields with type assertion (external Stellar SDK)
-      /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-      const txAny = tx as any;
-      const operation = txAny.operations?.[0];
-      const from = this.stringifyScalar(txAny.source_account);
+
+      const txData = tx as unknown as {
+        operations?: Array<{
+          to?: unknown;
+          destination?: unknown;
+          amount?: unknown;
+          starting_balance?: unknown;
+          asset_type?: string;
+          asset_code?: string;
+          asset_issuer?: string;
+        }>;
+        source_account?: unknown;
+        created_at?: unknown;
+        createdAt?: unknown;
+      };
+      const operation = txData.operations?.[0];
+      const from = this.stringifyScalar(txData.source_account);
       let to = '';
       let amount = 0;
       let asset = 'XLM';
       const timestamp =
-        this.stringifyScalar(txAny.created_at ?? txAny.createdAt) || undefined;
+        this.stringifyScalar(txData.created_at ?? txData.createdAt) ||
+        undefined;
 
       if (operation) {
         to = this.stringifyScalar(operation.to ?? operation.destination);
@@ -284,7 +300,6 @@ export class StellarService implements OnModuleInit {
           asset = `${operation.asset_code}:${operation.asset_issuer}`;
         }
       }
-      /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 
       return {
         verified: true,
@@ -313,13 +328,16 @@ export class StellarService implements OnModuleInit {
           return { asset: 'XLM', balance: b.balance };
         }
         // Access credit/issuer fields with type assertion for Stellar SDK union type
-        /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-        const credit = b as any;
+
+        const credit = b as unknown as {
+          asset_code: string;
+          asset_issuer: string;
+          balance: string;
+        };
         return {
           asset: `${credit.asset_code}:${credit.asset_issuer}`,
           balance: credit.balance,
         };
-        /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
       });
 
       return { balances };
@@ -342,14 +360,16 @@ export class StellarService implements OnModuleInit {
     try {
       const account = await this.server.loadAccount(walletAddress);
       // Access SDK response fields with type assertion (external Stellar SDK)
-      /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-      const accountAny = account as any;
+
+      const accountData = account as unknown as {
+        subentry_count?: number;
+      };
       return {
         address: walletAddress,
         exists: true,
         sequenceNumber: account.sequenceNumber(),
-        subentryCount: accountAny.subentry_count || 0,
-        /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+        subentryCount: accountData.subentry_count || 0,
+
         network: this.network,
       };
     } catch (error: unknown) {
@@ -442,7 +462,9 @@ export class StellarService implements OnModuleInit {
     }
   }
 
-  private async isDuplicateTransaction(transactionHash: string): Promise<boolean> {
+  private async isDuplicateTransaction(
+    transactionHash: string,
+  ): Promise<boolean> {
     if (!transactionHash) {
       throw new BadRequestException('transactionHash is required');
     }
@@ -522,7 +544,9 @@ export class StellarService implements OnModuleInit {
 
   private readString(value: unknown): string {
     if (typeof value !== 'string' || value.trim().length === 0) {
-      throw new BadRequestException('Webhook payload is missing required fields');
+      throw new BadRequestException(
+        'Webhook payload is missing required fields',
+      );
     }
 
     return value.trim();
@@ -552,7 +576,10 @@ export class StellarService implements OnModuleInit {
     const rawAsset =
       this.readOptionalString(value)?.toUpperCase() || TipAsset.XLM;
 
-    if (rawAsset === String(TipAsset.XLM) || rawAsset === String(TipAsset.USDC)) {
+    if (
+      rawAsset === String(TipAsset.XLM) ||
+      rawAsset === String(TipAsset.USDC)
+    ) {
       return rawAsset as TipAsset;
     }
 
