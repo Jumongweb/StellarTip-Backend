@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Horizon } from '@stellar/stellar-sdk';
+import { Horizon, Networks, rpc, Contract } from '@stellar/stellar-sdk';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHmac, timingSafeEqual } from 'crypto';
@@ -24,6 +24,19 @@ import {
   WITHDRAWAL_EVENT,
   normalizeContractEventTopic,
 } from './contract/events';
+
+// Type definitions for contract client
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type ContractClient = any;
+
+export interface ContractTipVerificationResult {
+  exists: boolean;
+  from: string;
+  to: string;
+  amount: number;
+  timestamp: string | null;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 @Injectable()
 export class StellarService implements OnModuleInit {
@@ -73,7 +86,8 @@ export class StellarService implements OnModuleInit {
     }
 
     if (!this.contractClient) {
-      this.contractClient = await contract.Client.from({
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
+      this.contractClient = await (Contract as any).Client.from({
         contractId: this.contractId,
         rpcUrl: this.sorobanRpcUrl,
         networkPassphrase: this.networkPassphrase,
@@ -81,6 +95,7 @@ export class StellarService implements OnModuleInit {
         server: this.sorobanServer,
         publicKey: undefined,
       });
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
     }
 
     return this.contractClient;

@@ -28,7 +28,7 @@ jest.mock('@stellar/stellar-sdk', () => {
     rpc: {
       Server: jest.fn().mockImplementation(() => ({})),
     },
-    contract: {
+    Contract: {
       Client: {
         from: jest.fn().mockResolvedValue({
           get_balance: mockGetBalance,
@@ -132,7 +132,7 @@ describe('StellarService', () => {
     };
 
     const stellarSdk = await import('@stellar/stellar-sdk');
-    (stellarSdk.contract.Client.from as jest.Mock).mockResolvedValue(
+    (stellarSdk.Contract.Client.from as jest.Mock).mockResolvedValue(
       mockContractClient,
     );
   });
@@ -247,7 +247,7 @@ describe('StellarService', () => {
 
     it('should return exists: false when the contract call fails', async () => {
       const stellarSdk = await import('@stellar/stellar-sdk');
-      (stellarSdk.contract.Client.from as jest.Mock).mockRejectedValueOnce(
+      (stellarSdk.Contract.Client.from as jest.Mock).mockRejectedValueOnce(
         new Error('RPC unavailable'),
       );
 
