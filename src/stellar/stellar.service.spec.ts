@@ -224,7 +224,9 @@ describe('StellarService', () => {
           },
         }),
       };
-      (Contract.Client.from as jest.Mock).mockResolvedValueOnce(mockClient);
+      ((Contract as any).Client.from as jest.Mock).mockResolvedValueOnce(
+        mockClient,
+      );
 
       const result = await service.verifyTipOnContract('GRECEIVER...', 0);
 
@@ -237,7 +239,7 @@ describe('StellarService', () => {
 
     it('should return exists: false when the contract call fails', async () => {
       const { Contract } = await import('@stellar/stellar-sdk');
-      (Contract.Client.from as jest.Mock).mockRejectedValueOnce(
+      ((Contract as any).Client.from as jest.Mock).mockRejectedValueOnce(
         new Error('RPC unavailable'),
       );
 
