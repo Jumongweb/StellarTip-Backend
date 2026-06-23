@@ -10,6 +10,9 @@ import { NotificationsService } from '../notifications/notifications.service';
 jest.mock('@stellar/stellar-sdk', () => {
   const mockLoadAccount = jest.fn();
   const mockTransactionCall = jest.fn();
+  const mockGetBalance = jest.fn();
+  const mockGetTip = jest.fn();
+  const mockGetTipCount = jest.fn();
 
   return {
     Horizon: {
@@ -22,6 +25,18 @@ jest.mock('@stellar/stellar-sdk', () => {
         }),
       })),
     },
+    rpc: {
+      Server: jest.fn().mockImplementation(() => ({})),
+    },
+    contract: {
+      Client: {
+        from: jest.fn().mockResolvedValue({
+          get_balance: mockGetBalance,
+          get_tip: mockGetTip,
+          get_tip_count: mockGetTipCount,
+        }),
+      },
+    },
     Networks: {
       TESTNET: 'TESTNET',
       PUBLIC: 'PUBLIC',
@@ -31,6 +46,11 @@ jest.mock('@stellar/stellar-sdk', () => {
 
 describe('StellarService', () => {
   let service: StellarService;
+  let mockContractClient: {
+    get_balance: jest.Mock;
+    get_tip: jest.Mock;
+    get_tip_count: jest.Mock;
+  };
 
   const createMockAccount = (): Record<string, unknown> => ({
     balances: [
@@ -71,7 +91,11 @@ describe('StellarService', () => {
             get: jest.fn((key: string) => {
               if (key === 'STELLAR_NODE_URL')
                 return 'https://horizon-testnet.stellar.org';
+              if (key === 'STELLAR_SOROBAN_URL')
+                return 'https://soroban-testnet.stellar.org';
               if (key === 'STELLAR_NETWORK') return 'TESTNET';
+              if (key === 'STELLAR_CONTRACT_ID')
+                return 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
               return undefined;
             }),
           },
@@ -100,6 +124,17 @@ describe('StellarService', () => {
 
     service = module.get<StellarService>(StellarService);
     service.onModuleInit();
+
+    mockContractClient = {
+      get_balance: jest.fn(),
+      get_tip: jest.fn(),
+      get_tip_count: jest.fn(),
+    };
+
+    const stellarSdk = await import('@stellar/stellar-sdk');
+    (stellarSdk.contract.Client.from as jest.Mock).mockResolvedValue(
+      mockContractClient,
+    );
   });
 
   it('should be defined', () => {
@@ -184,6 +219,40 @@ describe('StellarService', () => {
 
       const result = await service.verifyPayment('invalid-hash');
       expect(result.verified).toBe(false);
+    });
+  });
+
+  describe('verifyTipOnContract', () => {
+    it('should verify a valid contract tip record', async () => {
+      mockContractClient.get_balance.mockResolvedValue({ result: 100 });
+      mockContractClient.get_tip_count.mockResolvedValue({ result: 1 });
+      mockContractClient.get_tip.mockResolvedValue({
+        result: {
+          exists: true,
+          from: 'GSOURCE...',
+          to: 'GRECEIVER...',
+          amount: 10,
+          timestamp: '2026-06-22T12:00:00.000Z',
+        },
+      });
+
+      const result = await service.verifyTipOnContract('GRECEIVER...', 0);
+
+      expect(result.exists).toBe(true);
+      expect(result.from).toBe('GSOURCE...');
+      expect(result.to).toBe('GRECEIVER...');
+      expect(result.amount).toBe(10);
+      expect(result.timestamp).toBe('2026-06-22T12:00:00.000Z');
+    });
+
+    it('should return exists: false when the contract call fails', async () => {
+      const stellarSdk = await import('@stellar/stellar-sdk');
+      (stellarSdk.contract.Client.from as jest.Mock).mockRejectedValueOnce(
+        new Error('RPC unavailable'),
+      );
+
+      const result = await service.verifyTipOnContract('GRECEIVER...', 0);
+      expect(result.exists).toBe(false);
     });
   });
 });

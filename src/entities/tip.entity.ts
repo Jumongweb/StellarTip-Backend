@@ -42,7 +42,7 @@ export class Tip {
   @JoinColumn({ name: 'supporter_id' })
   supporter: User | null;
 
-  @Column({ name: 'supporter_id', nullable: true })
+  @Column('uuid', { name: 'supporter_id', nullable: true })
   supporterId: string | null;
 
   @Column({ name: 'sender_wallet' })
@@ -61,7 +61,7 @@ export class Tip {
   })
   asset: TipAsset;
 
-  @Column({ name: 'asset_issuer', nullable: true })
+  @Column('varchar', { name: 'asset_issuer', nullable: true })
   assetIssuer: string | null;
 
   @Column({ nullable: true })
