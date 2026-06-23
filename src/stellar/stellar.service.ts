@@ -26,7 +26,7 @@ import {
 } from './contract/events';
 
 // Type definitions for contract client
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-redundant-type-constituents */
 type ContractClient = any;
 
 export interface ContractTipVerificationResult {
@@ -36,7 +36,7 @@ export interface ContractTipVerificationResult {
   amount: number;
   timestamp: string | null;
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
+/* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-redundant-type-constituents */
 
 @Injectable()
 export class StellarService implements OnModuleInit {
@@ -196,6 +196,7 @@ export class StellarService implements OnModuleInit {
   ): Promise<ContractTipVerificationResult> {
     try {
       const client = await this.getContractClient();
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
       const contractAny = client as unknown as Record<
         string,
         (...args: Array<Record<string, unknown>>) => Promise<unknown>
@@ -207,6 +208,7 @@ export class StellarService implements OnModuleInit {
           contractAny.get_tip_count({ creatorAddress }),
           contractAny.get_tip({ creatorAddress, tipIndex }),
         ]);
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 
       const balance = this.toFiniteNumber(this.extractResult(balanceResponse));
       const tipCount = this.toFiniteNumber(

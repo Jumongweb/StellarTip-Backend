@@ -14,6 +14,12 @@ jest.mock('@stellar/stellar-sdk', () => {
   const mockGetTip = jest.fn();
   const mockGetTipCount = jest.fn();
 
+  const mockContractClient = {
+    get_balance: mockGetBalance,
+    get_tip: mockGetTip,
+    get_tip_count: mockGetTipCount,
+  };
+
   return {
     Horizon: {
       Server: jest.fn().mockImplementation(() => ({
@@ -30,11 +36,7 @@ jest.mock('@stellar/stellar-sdk', () => {
     },
     Contract: {
       Client: {
-        from: jest.fn().mockResolvedValue({
-          get_balance: mockGetBalance,
-          get_tip: mockGetTip,
-          get_tip_count: mockGetTipCount,
-        }),
+        from: jest.fn().mockResolvedValue(mockContractClient),
       },
     },
     Networks: {
@@ -46,11 +48,6 @@ jest.mock('@stellar/stellar-sdk', () => {
 
 describe('StellarService', () => {
   let service: StellarService;
-  let mockContractClient: {
-    get_balance: jest.Mock;
-    get_tip: jest.Mock;
-    get_tip_count: jest.Mock;
-  };
 
   const createMockAccount = (): Record<string, unknown> => ({
     balances: [
@@ -124,17 +121,6 @@ describe('StellarService', () => {
 
     service = module.get<StellarService>(StellarService);
     service.onModuleInit();
-
-    mockContractClient = {
-      get_balance: jest.fn(),
-      get_tip: jest.fn(),
-      get_tip_count: jest.fn(),
-    };
-
-    const stellarSdk = await import('@stellar/stellar-sdk');
-    (stellarSdk.Contract.Client.from as jest.Mock).mockResolvedValue(
-      mockContractClient,
-    );
   });
 
   it('should be defined', () => {
@@ -224,17 +210,21 @@ describe('StellarService', () => {
 
   describe('verifyTipOnContract', () => {
     it('should verify a valid contract tip record', async () => {
-      mockContractClient.get_balance.mockResolvedValue({ result: 100 });
-      mockContractClient.get_tip_count.mockResolvedValue({ result: 1 });
-      mockContractClient.get_tip.mockResolvedValue({
-        result: {
-          exists: true,
-          from: 'GSOURCE...',
-          to: 'GRECEIVER...',
-          amount: 10,
-          timestamp: '2026-06-22T12:00:00.000Z',
-        },
-      });
+      const { Contract } = await import('@stellar/stellar-sdk');
+      const mockClient = {
+        get_balance: jest.fn().mockResolvedValue({ result: 100 }),
+        get_tip_count: jest.fn().mockResolvedValue({ result: 1 }),
+        get_tip: jest.fn().mockResolvedValue({
+          result: {
+            exists: true,
+            from: 'GSOURCE...',
+            to: 'GRECEIVER...',
+            amount: 10,
+            timestamp: '2026-06-22T12:00:00.000Z',
+          },
+        }),
+      };
+      (Contract.Client.from as jest.Mock).mockResolvedValueOnce(mockClient);
 
       const result = await service.verifyTipOnContract('GRECEIVER...', 0);
 
@@ -246,8 +236,8 @@ describe('StellarService', () => {
     });
 
     it('should return exists: false when the contract call fails', async () => {
-      const stellarSdk = await import('@stellar/stellar-sdk');
-      (stellarSdk.Contract.Client.from as jest.Mock).mockRejectedValueOnce(
+      const { Contract } = await import('@stellar/stellar-sdk');
+      (Contract.Client.from as jest.Mock).mockRejectedValueOnce(
         new Error('RPC unavailable'),
       );
 

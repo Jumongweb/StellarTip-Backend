@@ -55,8 +55,8 @@ export class Tip {
   amount: number;
 
   @Column({
-    type: 'enum',
-    enum: TipAsset,
+    type: 'varchar',
+    length: 10,
     default: TipAsset.XLM,
   })
   asset: TipAsset;
@@ -71,16 +71,16 @@ export class Tip {
   transactionHash: string | null;
 
   @Column({
-    type: 'enum',
-    enum: TipStatus,
+    type: 'varchar',
+    length: 20,
     default: TipStatus.PENDING,
   })
   status: TipStatus;
 
   @Column({
     name: 'withdrawal_status',
-    type: 'enum',
-    enum: TipWithdrawalStatus,
+    type: 'varchar',
+    length: 20,
     default: TipWithdrawalStatus.NONE,
   })
   withdrawalStatus: TipWithdrawalStatus;
