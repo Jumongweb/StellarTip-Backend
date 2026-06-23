@@ -18,8 +18,11 @@ jobs:
     name: Create Release PR
     runs-on: ubuntu-latest
     steps:
-      - uses: google-github-actions/release-please-action@v4
+      - uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Use PAT with repo scope if GITHUB_TOKEN fails with permission errors
+          # Create a PAT at: https://github.com/settings/tokens/new?scopes=repo
+          # Add it as a secret named RELEASE_PLEASE_TOKEN
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
