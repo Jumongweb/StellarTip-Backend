@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { StellarService } from './stellar.service';
 import { ConfigService } from '@nestjs/config';
+import { Tip } from '../entities/tip.entity';
+import { TipsService } from '../tips/tips.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 jest.mock('@stellar/stellar-sdk', () => {
   const mockLoadAccount = jest.fn();
@@ -70,6 +74,25 @@ describe('StellarService', () => {
               if (key === 'STELLAR_NETWORK') return 'TESTNET';
               return undefined;
             }),
+          },
+        },
+        {
+          provide: getRepositoryToken(Tip),
+          useValue: {
+            findOne: jest.fn(),
+            save: jest.fn(),
+          },
+        },
+        {
+          provide: TipsService,
+          useValue: {
+            createTip: jest.fn(),
+          },
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            notifyTipReceived: jest.fn(),
           },
         },
       ],

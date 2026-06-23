@@ -59,7 +59,7 @@ describe('Stellar contract webhook (e2e)', () => {
       providers: [StellarService, TipsService, NotificationsService],
     }).compile();
 
-    app = moduleRef.createNestApplication(undefined, { rawBody: true });
+    app = moduleRef.createNestApplication();
     await app.init();
 
     userRepository = moduleRef.get<Repository<User>>(getRepositoryToken(User));
@@ -226,7 +226,7 @@ describe('Stellar contract webhook (e2e)', () => {
     expect(updatedTip.withdrawalTransactionHash).toBe('withdrawal-tx-001');
   });
 
-  function postSignedWebhook(payload: Record<string, unknown>) {
+  function postSignedWebhook(payload: Record<string, unknown>): request.Test {
     const rawBody = JSON.stringify(payload);
     const signature = createHmac('sha256', webhookSecret)
       .update(rawBody)

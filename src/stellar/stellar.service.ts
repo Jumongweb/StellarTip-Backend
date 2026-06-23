@@ -354,8 +354,8 @@ export class StellarService implements OnModuleInit {
     const rawAsset =
       this.readOptionalString(value)?.toUpperCase() || TipAsset.XLM;
 
-    if (rawAsset === TipAsset.XLM || rawAsset === TipAsset.USDC) {
-      return rawAsset;
+    if (rawAsset === String(TipAsset.XLM) || rawAsset === String(TipAsset.USDC)) {
+      return rawAsset as TipAsset;
     }
 
     throw new BadRequestException('Unsupported webhook asset');
@@ -365,11 +365,11 @@ export class StellarService implements OnModuleInit {
     const status = this.readOptionalString(value)?.toLowerCase();
 
     switch (status) {
-      case TipWithdrawalStatus.PENDING:
+      case String(TipWithdrawalStatus.PENDING):
         return TipWithdrawalStatus.PENDING;
-      case TipWithdrawalStatus.FAILED:
+      case String(TipWithdrawalStatus.FAILED):
         return TipWithdrawalStatus.FAILED;
-      case TipWithdrawalStatus.COMPLETED:
+      case String(TipWithdrawalStatus.COMPLETED):
       case null:
         return TipWithdrawalStatus.COMPLETED;
       default:
