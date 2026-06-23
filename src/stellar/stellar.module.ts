@@ -4,14 +4,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { StellarService } from './stellar.service';
 import { StellarController } from './stellar.controller';
 import { Tip } from '../entities/tip.entity';
-import { TipsModule } from '../tips/tips.module';
+import { User } from '../entities/user.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([Tip]),
-    TipsModule,
+    TypeOrmModule.forFeature([Tip, User]),
     NotificationsModule,
   ],
   providers: [StellarService],

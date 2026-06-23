@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  NotFoundException,
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -11,8 +12,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NotificationsService } from '../notifications/notifications.service';
-import { TipsService } from '../tips/tips.service';
-import { Tip, TipAsset, TipWithdrawalStatus } from '../entities/tip.entity';
+import {
+  Tip,
+  TipAsset,
+  TipStatus,
+  TipWithdrawalStatus,
+} from '../entities/tip.entity';
+import { User } from '../entities/user.entity';
 import {
   REGISTER_EVENT,
   StellarContractEventPayload,
@@ -51,7 +57,8 @@ export class StellarService implements OnModuleInit {
     private configService: ConfigService,
     @InjectRepository(Tip)
     private readonly tipsRepository: Repository<Tip>,
-    private readonly tipsService: TipsService,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -489,22 +496,37 @@ export class StellarService implements OnModuleInit {
     const amount = this.readAmount(data.amount);
     const message = this.readOptionalString(data.message);
     const assetIssuer = this.readOptionalString(data.assetIssuer);
+    const usdcIssuer = this.configService.get<string>('USDC_ISSUER') || null;
 
-    const tip = await this.tipsService.createTip({
-      receiverWallet,
-      senderWallet,
-      amount,
-      message: message || undefined,
-      asset,
-      assetIssuer: assetIssuer || undefined,
-      transactionHash: payload.transactionHash,
+    const creator = await this.usersRepository.findOne({
+      where: { walletAddress: receiverWallet },
     });
 
+    if (!creator) {
+      throw new NotFoundException('Creator not found with this wallet address');
+    }
+
+    const tip = new Tip();
+    tip.creator = creator;
+    tip.creatorId = creator.id;
+    tip.supporterId = null;
+    tip.senderWallet = senderWallet;
+    tip.receiverWallet = receiverWallet;
+    tip.amount = amount;
+    tip.asset = asset;
+    tip.assetIssuer =
+      asset === TipAsset.USDC ? assetIssuer || usdcIssuer : null;
+    tip.message = message || '';
+    tip.transactionHash = payload.transactionHash;
+    tip.status = TipStatus.COMPLETED;
+
+    const saved = await this.tipsRepository.save(tip);
+
     await this.notificationsService.notifyTipReceived(
-      tip.creatorId,
-      tip.senderWallet,
-      tip.amount,
-      tip.asset,
+      saved.creatorId,
+      saved.senderWallet,
+      saved.amount,
+      saved.asset,
     );
   }
 

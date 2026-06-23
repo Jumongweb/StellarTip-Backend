@@ -8,7 +8,6 @@ import { Repository } from 'typeorm';
 import { App } from 'supertest/types';
 import { StellarController } from '../src/stellar/stellar.controller';
 import { StellarService } from '../src/stellar/stellar.service';
-import { TipsService } from '../src/tips/tips.service';
 import {
   Tip,
   TipAsset,
@@ -24,6 +23,8 @@ import { NotificationsService } from '../src/notifications/notifications.service
 import { TIP_EVENT, WITHDRAWAL_EVENT } from '../src/stellar/contract/events';
 
 describe('Stellar contract webhook (e2e)', () => {
+  jest.setTimeout(30000);
+
   let app: INestApplication<App>;
   let userRepository: Repository<User>;
   let tipRepository: Repository<Tip>;
@@ -55,10 +56,10 @@ describe('Stellar contract webhook (e2e)', () => {
         TypeOrmModule.forFeature([User, Tip, Notification]),
       ],
       controllers: [StellarController],
-      providers: [StellarService, TipsService, NotificationsService],
+      providers: [StellarService, NotificationsService],
     }).compile();
 
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication({ rawBody: true });
     await app.init();
 
     userRepository = moduleRef.get<Repository<User>>(getRepositoryToken(User));

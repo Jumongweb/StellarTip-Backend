@@ -29,14 +29,14 @@ export enum TipAsset {
 @Entity('tips')
 export class Tip {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @ManyToOne(() => User, (user) => user.receivedTips)
   @JoinColumn({ name: 'creator_id' })
-  creator: User;
+  creator!: User;
 
   @Column('varchar', { name: 'creator_id' })
-  creatorId: string;
+  creatorId!: string;
 
   @ManyToOne(() => User, (user) => user.sentTips, { nullable: true })
   @JoinColumn({ name: 'supporter_id' })
@@ -46,26 +46,26 @@ export class Tip {
   supporterId: string | null;
 
   @Column('varchar', { name: 'sender_wallet' })
-  senderWallet: string;
+  senderWallet!: string;
 
   @Column('varchar', { name: 'receiver_wallet' })
-  receiverWallet: string;
+  receiverWallet!: string;
 
   @Column('decimal', { precision: 20, scale: 7 })
-  amount: number;
+  amount!: number;
 
   @Column({
     type: 'varchar',
     length: 10,
     default: TipAsset.XLM,
   })
-  asset: TipAsset;
+  asset!: TipAsset;
 
   @Column('varchar', { name: 'asset_issuer', nullable: true })
   assetIssuer: string | null;
 
   @Column('varchar', { nullable: true })
-  message: string;
+  message!: string;
 
   @Column('varchar', { unique: true, nullable: true })
   transactionHash: string | null;
@@ -75,7 +75,7 @@ export class Tip {
     length: 20,
     default: TipStatus.PENDING,
   })
-  status: TipStatus;
+  status!: TipStatus;
 
   @Column({
     name: 'withdrawal_status',
@@ -83,7 +83,7 @@ export class Tip {
     length: 20,
     default: TipWithdrawalStatus.NONE,
   })
-  withdrawalStatus: TipWithdrawalStatus;
+  withdrawalStatus!: TipWithdrawalStatus;
 
   @Column('varchar', {
     name: 'withdrawal_transaction_hash',
@@ -93,5 +93,5 @@ export class Tip {
   withdrawalTransactionHash: string | null;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 }
