@@ -35,7 +35,7 @@ export class Tip {
   @JoinColumn({ name: 'creator_id' })
   creator: User;
 
-  @Column({ name: 'creator_id' })
+  @Column('varchar', { name: 'creator_id' })
   creatorId: string;
 
   @ManyToOne(() => User, (user) => user.sentTips, { nullable: true })
@@ -45,10 +45,10 @@ export class Tip {
   @Column('uuid', { name: 'supporter_id', nullable: true })
   supporterId: string | null;
 
-  @Column({ name: 'sender_wallet' })
+  @Column('varchar', { name: 'sender_wallet' })
   senderWallet: string;
 
-  @Column({ name: 'receiver_wallet' })
+  @Column('varchar', { name: 'receiver_wallet' })
   receiverWallet: string;
 
   @Column('decimal', { precision: 20, scale: 7 })
@@ -64,10 +64,10 @@ export class Tip {
   @Column('varchar', { name: 'asset_issuer', nullable: true })
   assetIssuer: string | null;
 
-  @Column({ nullable: true })
+  @Column('varchar', { nullable: true })
   message: string;
 
-  @Column({ unique: true, nullable: true })
+  @Column('varchar', { unique: true, nullable: true })
   transactionHash: string | null;
 
   @Column({
@@ -85,7 +85,7 @@ export class Tip {
   })
   withdrawalStatus: TipWithdrawalStatus;
 
-  @Column({
+  @Column('varchar', {
     name: 'withdrawal_transaction_hash',
     unique: true,
     nullable: true,

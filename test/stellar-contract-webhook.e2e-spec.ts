@@ -39,6 +39,9 @@ describe('Stellar contract webhook (e2e)', () => {
     process.env.STELLAR_WEBHOOK_SECRET = webhookSecret;
     process.env.USDC_ISSUER =
       'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5ZG34P662Q';
+    process.env.STELLAR_NODE_URL = 'https://horizon-testnet.stellar.org';
+    process.env.STELLAR_SOROBAN_URL = 'https://soroban-testnet.stellar.org';
+    process.env.STELLAR_NETWORK = 'TESTNET';
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [
